@@ -66,15 +66,15 @@ export default function AdminDashboard() {
     flash("🗑️ Question deleted");
   };
 
-  const handleSaveXP = () => {
+  const handleSaveXP = async () => {
     if (!editXP) return;
-    updateUserXP(editXP.userId, editXP.xp);
+    await updateUserXP(editXP.userId, editXP.xp);
     setEditXP(null);
     flash("✅ XP updated!");
   };
 
-  const handleDeleteUser = (userId: string) => {
-    deleteUser(userId);
+  const handleDeleteUser = async (userId: string) => {
+    await deleteUser(userId);
     setConfirmDelete(null);
     flash("🗑️ User removed");
   };
