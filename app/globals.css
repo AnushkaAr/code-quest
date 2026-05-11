@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+/* ── Dark theme (default) ─────────────────────────────── */
+:root, [data-theme="dark"] {
   --bg-dark: #060b18;
   --bg-card: #0d1525;
   --bg-card2: #111d35;
@@ -12,6 +13,27 @@
   --border: rgba(108, 99, 255, 0.25);
   --text: #e2e8f0;
   --text-muted: #7a8499;
+  --nav-bg: rgba(6, 11, 24, 0.9);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ── Light theme ──────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-dark: #f0f2f8;
+  --bg-card: #ffffff;
+  --bg-card2: #f5f7ff;
+  --accent: #5b52e8;
+  --accent2: #0099bb;
+  --accent3: #e84545;
+  --gold: #cc9900;
+  --green: #00aa55;
+  --border: rgba(91, 82, 232, 0.2);
+  --text: #1a1f36;
+  --text-muted: #5a6380;
+  --nav-bg: rgba(240, 242, 248, 0.95);
+  --input-bg: rgba(0, 0, 0, 0.04);
+  --card-shadow: 0 4px 24px rgba(0,0,0,0.08);
 }
 
 * { box-sizing: border-box; }
@@ -56,7 +78,7 @@ body {
 .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.8rem; }
 
 .input-field {
-  width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  width: 100%; background: var(--input-bg); border: 1px solid var(--border);
   border-radius: 8px; padding: 0.75rem 1rem; color: var(--text); font-size: 0.95rem;
   outline: none; transition: border-color 0.2s;
 }
@@ -101,7 +123,7 @@ body {
 }
 
 .nav {
-  background: rgba(6,11,24,0.92);
+  background: var(--nav-bg);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(20px);
   position: sticky; top: 0; z-index: 100;
@@ -109,7 +131,7 @@ body {
 
 .sidebar {
   width: 240px; min-height: calc(100vh - 64px);
-  background: rgba(13,21,37,0.7);
+  background: var(--bg-card);
   border-right: 1px solid var(--border);
   padding: 1.25rem 1rem;
   display: flex; flex-direction: column; gap: 0.5rem;
