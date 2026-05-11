@@ -1,6 +1,3 @@
-Here's the full rewritten `lib/store.ts` with Supabase Auth:
-
-```ts
 "use client";
 import { create } from "zustand";
 import { User, xpToLevel, QUESTIONS, Question } from "./data";
@@ -281,16 +278,4 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return get().users.filter(u => u.role === "user" && u.lastActive && u.lastActive > cutoff);
   },
 }));
-```
 
----
-
-**What changed:**
-- `login` now uses `sb.auth.signInWithPassword()` — no more password checking manually
-- `logout` now calls `sb.auth.signOut()`
-- `register` now uses `sb.auth.signUp()` — Supabase stores the password securely
-- `initStore` checks for existing Supabase session on page load
-- Removed all `DEFAULT_USERS` and password references
-- Removed `LS.getUsers` / `LS.setUsers` — users come from Supabase only
-
-Replace your file and tell me when done — then we move to **`components/AuthPage.tsx`** ✅
