@@ -1,3 +1,6 @@
+Here's the full `lib/data.ts` file:
+
+```ts
 export type QuestionType = "theory" | "coding";
 export type Difficulty = "easy" | "medium" | "hard";
 export type ClassLevel = "python";
@@ -24,7 +27,6 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  password: string;
   role: "admin" | "user";
   avatar: string;
   level: number;
@@ -283,15 +285,6 @@ export const QUESTIONS: Question[] = [
   },
 ];
 
-export const DEFAULT_USERS: User[] = [
-  {
-    id: "admin-001", username: "admin", email: "admin@codequest.com",
-    password: "admin123", role: "admin", avatar: "🧙",
-    level: 99, xp: 99999, completedQuestions: [],
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export function xpToLevel(xp: number): number {
   return Math.floor(Math.sqrt(xp / 100)) + 1;
 }
@@ -304,3 +297,8 @@ export const CLASS_LEVELS = ["python"] as const;
 export const CLASS_TOPICS: Record<string, string[]> = {
   "python": ["Python Basics", "Data Types", "Conditionals", "Loops", "Functions", "Lists", "Recursion", "OOP"],
 };
+```
+
+---
+
+Replace your entire `lib/data.ts` with this. Done? Then tell me and we move to **`lib/store.ts`** ✅
