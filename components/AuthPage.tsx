@@ -14,6 +14,7 @@ export default function AuthPage() {
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState("🧙");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetFields = () => {
     setEmail(""); setPassword(""); setUsername(""); setError("");
@@ -21,20 +22,48 @@ export default function AuthPage() {
 
   const handleSubmit = async () => {
     setError("");
-    if (mainMode === "admin") {
-      const r = await login(email, password);
-      if (!r.success) { setError(r.error || "Login failed"); return; }
-      if (r.role !== "admin") { setError("Access denied. Admin accounts only."); return; }
-      return;
-    }
-    if (mode === "login") {
-      const r = await login(email, password);
-      if (!r.success) { setError(r.error || "Login failed"); return; }
-      if (r.role === "admin") { setError("Use the Admin panel to log in as admin."); return; }
-    } else {
-      if (!username.trim()) { setError("Username is required"); return; }
-      const r = await register(username, email, password, avatar);
-      if (!r.success) setError(r.error || "Registration failed");
+    setIsSubmitting(true);
+
+    try {
+      if (mainMode === "admin") {
+        const r = await login(email, password);
+        if (!r.success) { setError(r.error || "Login failed"); return; }
+        if (r.role !== "admin") { setError("Access denied. Admin accounts only."); return; }
+        return;
+      }
+
+      if (mode === "login") {
+        const r = await login(email, password);
+        if (!r.success) {
+          // Clean up Supabase error messages for users
+          if (r.error?.includes("Invalid login credentials")) {
+            setError("Invalid email or password. Please try again.");
+          } else if (r.error?.includes("Email not confirmed")) {
+            setError("Please confirm your email before logging in.");
+          } else {
+            setError(r.error || "Login failed");
+          }
+          return;
+        }
+        if (r.role === "admin") { setError("Use the Admin panel to log in as admin."); return; }
+      } else {
+        if (!username.trim()) { setError("Username is required"); return; }
+        if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+        const r = await register(username, email, password, avatar);
+        if (!r.success) {
+          if (r.error?.includes("already registered") || r.error?.includes("already in use")) {
+            setError("Email already in use. Try logging in instead.");
+          } else if (r.error?.includes("already taken")) {
+            setError("Username already taken. Choose a different one.");
+          } else if (r.error?.includes("valid email")) {
+            setError("Please enter a valid email address.");
+          } else {
+            setError(r.error || "Registration failed");
+          }
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -44,7 +73,10 @@ export default function AuthPage() {
     resetFields();
   };
 
-  const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.4rem", fontWeight: "600" };
+  const labelStyle: React.CSSProperties = {
+    display: "block", fontSize: "0.8rem", color: "var(--text-muted)",
+    marginBottom: "0.4rem", fontWeight: "600"
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
@@ -136,9 +168,18 @@ export default function AuthPage() {
               </div>
             )}
 
-            <button className="btn-primary" onClick={handleSubmit}
-              style={{ width: "100%", justifyContent: "center", marginTop: "0.25rem", padding: "0.85rem", background: mainMode === "admin" ? "linear-gradient(135deg, #ff6b6b, #ee5a24)" : undefined }}>
-              {mainMode === "admin" ? "🔐 Admin Sign In" : mode === "login" ? "🚀 Sign In" : "⚔️ Start Quest"}
+            <button
+              className="btn-primary"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              style={{ width: "100%", justifyContent: "center", marginTop: "0.25rem", padding: "0.85rem", background: mainMode === "admin" ? "linear-gradient(135deg, #ff6b6b, #ee5a24)" : undefined, opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "not-allowed" : "pointer" }}>
+              {isSubmitting
+                ? "⏳ Please wait..."
+                : mainMode === "admin"
+                  ? "🔐 Admin Sign In"
+                  : mode === "login"
+                    ? "🚀 Sign In"
+                    : "⚔️ Start Quest"}
             </button>
           </div>
         </div>
