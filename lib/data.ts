@@ -1,6 +1,3 @@
-Here's the full `lib/data.ts` file:
-
-```ts
 export type QuestionType = "theory" | "coding";
 export type Difficulty = "easy" | "medium" | "hard";
 export type ClassLevel = "python";
@@ -297,8 +294,5 @@ export const CLASS_LEVELS = ["python"] as const;
 export const CLASS_TOPICS: Record<string, string[]> = {
   "python": ["Python Basics", "Data Types", "Conditionals", "Loops", "Functions", "Lists", "Recursion", "OOP"],
 };
-```
-
----
 
 Replace your entire `lib/data.ts` with this. Done? Then tell me and we move to **`lib/store.ts`** ✅
