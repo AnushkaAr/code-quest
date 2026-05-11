@@ -6,19 +6,18 @@ import UserDashboard from "@/components/UserDashboard";
 import AdminDashboard from "@/components/AdminDashboard";
 
 export default function Home() {
-  const { currentUser, initStore } = useAuthStore();
+  const { currentUser, initStore, loading } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    initStore();
-    setMounted(true);
+    initStore().then(() => setMounted(true));
   }, []);
 
-  if (!mounted) {
+  if (!mounted || loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⚔️</div>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem", animation: "pulse-glow 2s infinite" }}>🐍</div>
           <p style={{ color: "var(--text-muted)" }}>Loading Code Quest...</p>
         </div>
       </div>
