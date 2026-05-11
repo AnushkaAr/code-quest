@@ -3,16 +3,31 @@ import { useAuthStore } from "@/lib/store";
 import { xpForNextLevel } from "@/lib/data";
 
 export default function Navbar({ title = "Code Quest" }: { title?: string }) {
-  const { currentUser, logout, theme, toggleTheme } = useAuthStore();
+  const { currentUser, logout, theme, toggleTheme, isAuthLoading } = useAuthStore();
+
+  // Wait for Supabase session to resolve — prevents nav flicker on page load
+  if (isAuthLoading) return null;
   if (!currentUser) return null;
 
   const nextLevelXP = xpForNextLevel(currentUser.level);
   const prevLevelXP = xpForNextLevel(currentUser.level - 1);
-  const progress = Math.min(100, ((currentUser.xp - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100);
+  const progress = Math.min(
+    100,
+    ((currentUser.xp - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100
+  );
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   return (
     <nav className="nav">
       <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 1.5rem", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "linear-gradient(135deg, var(--accent), var(--accent2))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", boxShadow: "0 0 15px rgba(108,99,255,0.4)" }}>🐍</div>
@@ -28,6 +43,8 @@ export default function Navbar({ title = "Code Quest" }: { title?: string }) {
 
         {/* Right side */}
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+
+          {/* XP bar — students only */}
           {currentUser.role === "user" && (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <div style={{ textAlign: "right" }}>
@@ -41,6 +58,8 @@ export default function Navbar({ title = "Code Quest" }: { title?: string }) {
               </div>
             </div>
           )}
+
+          {/* Avatar + username */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg, rgba(108,99,255,0.3), rgba(0,212,255,0.2))", border: "2px solid var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>
               {currentUser.avatar}
@@ -49,16 +68,25 @@ export default function Navbar({ title = "Code Quest" }: { title?: string }) {
               <div style={{ fontSize: "0.85rem", fontWeight: "600" }}>{currentUser.username}</div>
             </div>
           </div>
-          <button onClick={toggleTheme}
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
             title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border)", color: "var(--text-muted)", padding: "0.4rem 0.7rem", borderRadius: "8px", cursor: "pointer", fontSize: "1.1rem", transition: "all 0.2s", lineHeight: 1 }}
             onMouseOver={e => (e.currentTarget.style.background = "rgba(255,255,255,0.13)")}
-            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}>
+            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
+          >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
-          <button onClick={logout} style={{ background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.3)", color: "var(--accent3)", padding: "0.4rem 0.9rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600", transition: "all 0.2s" }}
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            style={{ background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.3)", color: "var(--accent3)", padding: "0.4rem 0.9rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600", transition: "all 0.2s" }}
             onMouseOver={e => (e.currentTarget.style.background = "rgba(255,107,107,0.2)")}
-            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,107,107,0.1)")}>
+            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,107,107,0.1)")}
+          >
             Logout
           </button>
         </div>
