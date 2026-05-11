@@ -1,6 +1,9 @@
+Here's the full rewritten `lib/store.ts` with Supabase Auth:
+
+```ts
 "use client";
 import { create } from "zustand";
-import { User, DEFAULT_USERS, xpToLevel, QUESTIONS, Question } from "./data";
+import { User, xpToLevel, QUESTIONS, Question } from "./data";
 
 async function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,7 +22,7 @@ interface AuthStore {
   theme: "dark" | "light";
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   register: (username: string, email: string, password: string, avatar: string) => Promise<{ success: boolean; error?: string }>;
   completeQuestion: (questionId: number, xpEarned: number) => void;
   updateQuestion: (id: number, updates: Partial<Question>) => void;
@@ -34,8 +37,6 @@ interface AuthStore {
 }
 
 const LS = {
-  getUsers: (): User[] => { try { const s = localStorage.getItem("cq_users"); return s ? JSON.parse(s) : [...DEFAULT_USERS]; } catch { return [...DEFAULT_USERS]; } },
-  setUsers: (u: User[]) => { try { localStorage.setItem("cq_users", JSON.stringify(u)); } catch {} },
   getCurrentUser: (): User | null => { try { const s = localStorage.getItem("cq_current_user"); return s ? JSON.parse(s) : null; } catch { return null; } },
   setCurrentUser: (u: User | null) => { try { if (u) localStorage.setItem("cq_current_user", JSON.stringify(u)); else localStorage.removeItem("cq_current_user"); } catch {} },
   getQuestions: (): Question[] => { try { const s = localStorage.getItem("cq_questions"); return s ? JSON.parse(s) : QUESTIONS; } catch { return QUESTIONS; } },
@@ -84,25 +85,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   initStore: async () => {
     if (typeof window === "undefined") return;
     set({ loading: true });
+
     const savedTheme = LS.getTheme();
     set({ theme: savedTheme });
     applyTheme(savedTheme);
 
-    const [sbUsers, sbQuestions] = await Promise.all([sbFetch("users"), sbFetch("questions")]);
-
-    let users: User[];
-    if (sbUsers && sbUsers.length > 0) {
-      users = sbUsers as User[];
-      LS.setUsers(users);
-    } else {
-      users = LS.getUsers();
-      if (users.length === 0) {
-        users = [...DEFAULT_USERS];
-        LS.setUsers(users);
-        for (const u of users) await sbUpsert("users", u);
-      }
-    }
-
+    // Load questions
+    const sbQuestions = await sbFetch("questions");
     let questions: Question[];
     if (sbQuestions && sbQuestions.length > 0) {
       questions = sbQuestions as Question[];
@@ -111,70 +100,139 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       questions = LS.getQuestions();
     }
 
-    const saved = LS.getCurrentUser();
+    // Load all users for leaderboard/admin
+    const sbUsers = await sbFetch("users");
+    const users: User[] = sbUsers ? (sbUsers as User[]) : [];
+
+    // Check if user is already logged in via Supabase Auth session
+    const sb = await getSupabase();
     let currentUser: User | null = null;
-    if (saved) {
-      currentUser = users.find(u => u.id === saved.id) || null;
-      if (currentUser) LS.setCurrentUser(currentUser);
+
+    if (sb) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session?.user) {
+        // Get their profile from users table
+        const { data: profile } = await sb.from("users").select("*").eq("id", session.user.id).single();
+        if (profile) {
+          currentUser = profile as User;
+          LS.setCurrentUser(currentUser);
+        }
+      }
+    }
+
+    // Fallback to localStorage if no session
+    if (!currentUser) {
+      const saved = LS.getCurrentUser();
+      if (saved) {
+        currentUser = users.find(u => u.id === saved.id) || null;
+      }
     }
 
     set({ users, questions, currentUser, loading: false });
   },
 
   login: async (email, password) => {
-    // Always re-fetch from Supabase so any device sees the latest users
-    const sbUsers = await sbFetch("users");
-    let users = sbUsers && sbUsers.length > 0 ? (sbUsers as User[]) : LS.getUsers();
-    LS.setUsers(users);
-    set({ users });
+    const sb = await getSupabase();
+    if (!sb) return { success: false, error: "Connection error. Please try again." };
 
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!user) return { success: false, error: "Invalid email or password. Make sure you registered on this website." };
+    // Sign in with Supabase Auth
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
+    if (error || !data.user) {
+      return { success: false, error: "Invalid email or password." };
+    }
+
+    // Get user profile from users table
+    const { data: profile, error: profileError } = await sb.from("users").select("*").eq("id", data.user.id).single();
+
+    if (profileError || !profile) {
+      return { success: false, error: "User profile not found. Please contact admin." };
+    }
+
+    const user = profile as User;
+
+    // Update lastActive
     const now = new Date().toISOString();
     const updated = { ...user, lastActive: now };
-    const updatedUsers = users.map(u => u.id === user.id ? updated : u);
-    set({ currentUser: updated, users: updatedUsers });
-    LS.setUsers(updatedUsers);
-    LS.setCurrentUser(updated);
     await sbUpsert("users", updated);
+
+    // Update users list
+    const { users } = get();
+    const updatedUsers = users.map(u => u.id === updated.id ? updated : u);
+    if (!updatedUsers.find(u => u.id === updated.id)) updatedUsers.push(updated);
+
+    set({ currentUser: updated, users: updatedUsers });
+    LS.setCurrentUser(updated);
+
     return { success: true, role: user.role };
   },
 
-  logout: () => { set({ currentUser: null }); LS.setCurrentUser(null); },
+  logout: async () => {
+    const sb = await getSupabase();
+    if (sb) await sb.auth.signOut();
+    set({ currentUser: null });
+    LS.setCurrentUser(null);
+  },
 
   register: async (username, email, password, avatar) => {
-    const sbUsers = await sbFetch("users");
-    let users = sbUsers && sbUsers.length > 0 ? (sbUsers as User[]) : LS.getUsers();
-    set({ users });
+    const sb = await getSupabase();
+    if (!sb) return { success: false, error: "Connection error. Please try again." };
 
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase()))
-      return { success: false, error: "Email already in use" };
-    if (users.find(u => u.username.toLowerCase() === username.toLowerCase()))
-      return { success: false, error: "Username already taken" };
+    // Check if username already taken
+    const { data: existingUsername } = await sb.from("users").select("id").eq("username", username).single();
+    if (existingUsername) return { success: false, error: "Username already taken" };
 
+    // Sign up with Supabase Auth
+    const { data, error } = await sb.auth.signUp({ email, password });
+
+    if (error) {
+      if (error.message.includes("already registered")) {
+        return { success: false, error: "Email already in use" };
+      }
+      return { success: false, error: error.message };
+    }
+
+    if (!data.user) return { success: false, error: "Registration failed. Please try again." };
+
+    // Create user profile in users table
     const newUser: User = {
-      id: `user-${Date.now()}`, username, email, password,
-      role: "user", avatar, level: 1, xp: 0,
-      completedQuestions: [], createdAt: new Date().toISOString(),
+      id: data.user.id,
+      username,
+      email,
+      role: "user",
+      avatar,
+      level: 1,
+      xp: 0,
+      completedQuestions: [],
+      createdAt: new Date().toISOString(),
       lastActive: new Date().toISOString(),
     };
-    const updated = [...users, newUser];
-    set({ users: updated, currentUser: newUser });
-    LS.setUsers(updated);
-    LS.setCurrentUser(newUser);
+
     await sbUpsert("users", newUser);
+
+    const { users } = get();
+    const updatedUsers = [...users, newUser];
+    set({ users: updatedUsers, currentUser: newUser });
+    LS.setCurrentUser(newUser);
+
     return { success: true };
   },
 
   completeQuestion: async (questionId, xpEarned) => {
     const { currentUser, users } = get();
     if (!currentUser || currentUser.completedQuestions.includes(questionId)) return;
+
     const newXP = currentUser.xp + xpEarned;
-    const updated = { ...currentUser, xp: newXP, level: xpToLevel(newXP), completedQuestions: [...currentUser.completedQuestions, questionId], lastActive: new Date().toISOString() };
+    const updated = {
+      ...currentUser,
+      xp: newXP,
+      level: xpToLevel(newXP),
+      completedQuestions: [...currentUser.completedQuestions, questionId],
+      lastActive: new Date().toISOString(),
+    };
     const updatedUsers = users.map(u => u.id === currentUser.id ? updated : u);
     set({ currentUser: updated, users: updatedUsers });
-    LS.setUsers(updatedUsers); LS.setCurrentUser(updated);
+    LS.setCurrentUser(updated);
     await sbUpsert("users", updated);
   },
 
@@ -184,41 +242,55 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const target = updatedUsers.find(u => u.id === userId);
     const updatedCurrent = currentUser?.id === userId ? { ...currentUser, xp, level: xpToLevel(xp) } : currentUser;
     set({ users: updatedUsers, currentUser: updatedCurrent });
-    LS.setUsers(updatedUsers);
     if (updatedCurrent) LS.setCurrentUser(updatedCurrent);
     if (target) await sbUpsert("users", target);
   },
 
   deleteUser: async (userId) => {
     const updated = get().users.filter(u => u.id !== userId);
-    set({ users: updated }); LS.setUsers(updated);
+    set({ users: updated });
     await sbDelete("users", "id", userId);
   },
 
   updateQuestion: async (id, updates) => {
     const updated = get().questions.map(q => q.id === id ? { ...q, ...updates } : q);
-    set({ questions: updated }); LS.setQuestions(updated);
+    set({ questions: updated });
+    LS.setQuestions(updated);
     const target = updated.find(q => q.id === id);
     if (target) await sbUpsert("questions", target);
   },
 
   deleteQuestion: async (id) => {
     const updated = get().questions.filter(q => q.id !== id);
-    set({ questions: updated }); LS.setQuestions(updated);
-    await sbDeleteQuestion(id);
+    set({ questions: updated });
+    LS.setQuestions(updated);
+    await sbDelete("questions", "id", id);
   },
 
   addQuestion: async (q) => {
     const updated = [...get().questions, q];
-    set({ questions: updated }); LS.setQuestions(updated);
+    set({ questions: updated });
+    LS.setQuestions(updated);
     await sbUpsert("questions", q);
   },
 
   getLeaderboard: () => get().users.filter(u => u.role === "user").sort((a, b) => b.xp - a.xp).slice(0, 10),
+
   getActiveUsers: () => {
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     return get().users.filter(u => u.role === "user" && u.lastActive && u.lastActive > cutoff);
   },
 }));
+```
 
-async function sbDeleteQuestion(id: number) { await sbDelete("questions", "id", id); }
+---
+
+**What changed:**
+- `login` now uses `sb.auth.signInWithPassword()` — no more password checking manually
+- `logout` now calls `sb.auth.signOut()`
+- `register` now uses `sb.auth.signUp()` — Supabase stores the password securely
+- `initStore` checks for existing Supabase session on page load
+- Removed all `DEFAULT_USERS` and password references
+- Removed `LS.getUsers` / `LS.setUsers` — users come from Supabase only
+
+Replace your file and tell me when done — then we move to **`components/AuthPage.tsx`** ✅
