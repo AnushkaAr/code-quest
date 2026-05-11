@@ -108,8 +108,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (sb) {
       const { data: { session } } = await sb.auth.getSession();
       if (session?.user) {
-        // Get their profile from users table
-        const { data: profile } = await sb.from("users").select("*").eq("id", session.user.id).single();
+        // FIX: Use toString() to match text id in public.users
+        const { data: profile } = await sb.from("users").select("*").eq("id", session.user.id.toString()).single();
         if (profile) {
           currentUser = profile as User;
           LS.setCurrentUser(currentUser);
@@ -139,11 +139,32 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       return { success: false, error: "Invalid email or password." };
     }
 
-    // Get user profile from users table
-    const { data: profile, error: profileError } = await sb.from("users").select("*").eq("id", data.user.id).single();
+    // FIX: Use toString() to match text id in public.users
+    const { data: profile, error: profileError } = await sb
+      .from("users")
+      .select("*")
+      .eq("id", data.user.id.toString())
+      .single();
 
     if (profileError || !profile) {
-      return { success: false, error: "User profile not found. Please contact admin." };
+      // FIX: Auto-create profile if missing instead of failing
+      const newUser: User = {
+        id: data.user.id.toString(),
+        username: data.user.email?.split("@")[0] || "user",
+        email: data.user.email || email,
+        role: "user",
+        avatar: "",
+        level: 1,
+        xp: 0,
+        completedQuestions: [],
+        createdAt: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+      };
+      await sbUpsert("users", newUser);
+      const { users } = get();
+      set({ currentUser: newUser, users: [...users, newUser] });
+      LS.setCurrentUser(newUser);
+      return { success: true, role: "user" };
     }
 
     const user = profile as User;
@@ -191,9 +212,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     if (!data.user) return { success: false, error: "Registration failed. Please try again." };
 
-    // Create user profile in users table
+    // FIX: Use toString() to ensure id is text type matching public.users
     const newUser: User = {
-      id: data.user.id,
+      id: data.user.id.toString(),
       username,
       email,
       role: "user",
@@ -278,4 +299,3 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return get().users.filter(u => u.role === "user" && u.lastActive && u.lastActive > cutoff);
   },
 }));
-
