@@ -3,10 +3,9 @@ import { useAuthStore } from "@/lib/store";
 import { xpForNextLevel } from "@/lib/data";
 
 export default function Navbar({ title = "Code Quest" }: { title?: string }) {
-  const { currentUser, logout, theme, toggleTheme, isAuthLoading } = useAuthStore();
+  const { currentUser, logout, theme, toggleTheme } = useAuthStore();
 
   // Wait for Supabase session to resolve — prevents nav flicker on page load
-  if (isAuthLoading) return null;
   if (!currentUser) return null;
 
   const nextLevelXP = xpForNextLevel(currentUser.level);
