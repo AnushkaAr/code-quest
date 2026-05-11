@@ -3,7 +3,7 @@ import { useAuthStore } from "@/lib/store";
 import { xpForNextLevel } from "@/lib/data";
 
 export default function Navbar({ title = "Code Quest" }: { title?: string }) {
-  const { currentUser, logout } = useAuthStore();
+  const { currentUser, logout, theme, toggleTheme } = useAuthStore();
   if (!currentUser) return null;
 
   const nextLevelXP = xpForNextLevel(currentUser.level);
@@ -49,6 +49,13 @@ export default function Navbar({ title = "Code Quest" }: { title?: string }) {
               <div style={{ fontSize: "0.85rem", fontWeight: "600" }}>{currentUser.username}</div>
             </div>
           </div>
+          <button onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border)", color: "var(--text-muted)", padding: "0.4rem 0.7rem", borderRadius: "8px", cursor: "pointer", fontSize: "1.1rem", transition: "all 0.2s", lineHeight: 1 }}
+            onMouseOver={e => (e.currentTarget.style.background = "rgba(255,255,255,0.13)")}
+            onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}>
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
           <button onClick={logout} style={{ background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.3)", color: "var(--accent3)", padding: "0.4rem 0.9rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600", transition: "all 0.2s" }}
             onMouseOver={e => (e.currentTarget.style.background = "rgba(255,107,107,0.2)")}
             onMouseOut={e => (e.currentTarget.style.background = "rgba(255,107,107,0.1)")}>
