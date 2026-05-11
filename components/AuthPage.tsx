@@ -109,7 +109,7 @@ export default function AuthPage() {
             )}
             <div>
               <label style={labelStyle}>EMAIL</label>
-              <input className="input-field" type="email" placeholder={mainMode === "admin" ? "admin@codequest.com" : "your@email.com"} value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+              <input className="input-field" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
             </div>
             <div>
               <label style={labelStyle}>PASSWORD</label>
