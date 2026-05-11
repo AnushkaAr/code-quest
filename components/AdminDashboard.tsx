@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuthStore } from "@/lib/store";
-import { QUESTIONS, Question, QuestionType, Difficulty, ClassLevel, CLASS_TOPICS } from "@/lib/data";
+import { Question, QuestionType, Difficulty, ClassLevel, CLASS_TOPICS } from "@/lib/data";
 import Navbar from "./Navbar";
 
 type Tab = "overview" | "questions" | "users";
@@ -16,9 +16,8 @@ const EMPTY_Q: Omit<Question, "id"> = {
 const labelStyle: React.CSSProperties = { display: "block", marginBottom: "0.35rem", fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: "600", letterSpacing: "0.04em" };
 
 export default function AdminDashboard() {
-  const { users, updateUserXP, deleteUser, getLeaderboard, getActiveUsers } = useAuthStore();
+  const { users, questions, updateUserXP, deleteUser, getLeaderboard, getActiveUsers, updateQuestion, deleteQuestion, addQuestion } = useAuthStore();
   const [tab, setTab] = useState<Tab>("overview");
-  const [questions, setQuestions] = useState<Question[]>(QUESTIONS);
   const [editQ, setEditQ] = useState<Question | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [formQ, setFormQ] = useState<Omit<Question, "id">>(EMPTY_Q);
@@ -29,14 +28,9 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("cq_questions");
-    setQuestions(saved ? JSON.parse(saved) : QUESTIONS);
-  }, [tab]);
-
   const saveQuestions = (qs: Question[]) => {
-    localStorage.setItem("cq_questions", JSON.stringify(qs));
-    setQuestions(qs);
+    // Update each changed question through the store (syncs to Supabase)
+    qs.forEach(q => updateQuestion(q.id, q));
   };
 
   const flash = (text: string, type = "success") => {
@@ -46,7 +40,7 @@ export default function AdminDashboard() {
 
   const handleSaveEdit = () => {
     if (!editQ) return;
-    saveQuestions(questions.map(q => q.id === editQ.id ? editQ : q));
+    updateQuestion(editQ.id, editQ);
     setEditQ(null);
     flash("✅ Question updated!");
   };
@@ -54,7 +48,7 @@ export default function AdminDashboard() {
   const handleAdd = () => {
     if (!formQ.title.trim() || !formQ.description.trim()) { flash("Title and description required", "error"); return; }
     const newQ: Question = { ...formQ, id: Math.max(0, ...questions.map(q => q.id)) + 1 };
-    saveQuestions([...questions, newQ]);
+    addQuestion(newQ);
     setAddMode(false);
     setFormQ(EMPTY_Q);
     flash("✅ Question added!");
@@ -62,19 +56,19 @@ export default function AdminDashboard() {
 
   const handleDelete = (id: number) => {
     if (!confirm("Delete this question?")) return;
-    saveQuestions(questions.filter(q => q.id !== id));
+    deleteQuestion(id);
     flash("🗑️ Question deleted");
   };
 
-  const handleSaveXP = async () => {
+  const handleSaveXP = () => {
     if (!editXP) return;
-    await updateUserXP(editXP.userId, editXP.xp);
+    updateUserXP(editXP.userId, editXP.xp);
     setEditXP(null);
     flash("✅ XP updated!");
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    await deleteUser(userId);
+  const handleDeleteUser = (userId: string) => {
+    deleteUser(userId);
     setConfirmDelete(null);
     flash("🗑️ User removed");
   };
